@@ -84,6 +84,7 @@ class WK3Interface(QMainWindow):
         self.current_pin_config = 0x06  # Default: Key 2 on (bit 2) and sidetone on (bit 1)
         self.paddle_swapped = False
         self.sidetone_enabled = True
+        self.ultimatic_priority = 0  # 0=Normal, 1=Dah Priority, 2=Dit Priority
         self.host_mode_active = False
         self.current_wpm = 20  # Default 20 WPM
         self.current_key_comp = 50  # Default 50ms key compensation
@@ -757,16 +758,6 @@ class WK3Interface(QMainWindow):
         mode_values = [0x40, 0x50, 0x60, 0x70]  # Iambic B, Iambic A, Ultimatic, Bug
         mode_value = mode_values[mode]
         
-        # For Ultimatic mode, handle the priority setting
-        if mode == 2:  # Ultimatic mode
-            ultimatic_priority = self.ultimatic_priority.currentIndex()
-            if ultimatic_priority == 1:  # Dah Priority
-                mode_value = 0x10  # 00010000 - Dah priority
-            elif ultimatic_priority == 2:  # Dit Priority
-                mode_value = 0x20  # 00100000 - Dit priority
-            else:  # Normal
-                mode_value = 0x00  # 00000000 - Normal priority
-        
         # Preserve paddle swap setting
         if self.paddle_swapped:
             mode_value |= 0x08  # Set bit 3 (paddle swap)
@@ -774,16 +765,35 @@ class WK3Interface(QMainWindow):
         # Preserve other bits (bit 7)
         self.current_mode_register = (self.current_mode_register & 0x80) | (mode_value & 0x7F)
         
+        # For Ultimatic mode, handle the priority setting in pin config
+        if mode == 2:  # Ultimatic mode
+            self.ultimatic_priority = self.ultimatic_priority.currentIndex()
+            # Clear bits 5-6 (ultimatic priority bits)
+            self.current_pin_config &= ~0x60
+            
+            if self.ultimatic_priority == 1:  # Dah Priority
+                self.current_pin_config |= 0x20  # Set bit 5 for Dah priority
+            elif self.ultimatic_priority == 2:  # Dit Priority
+                self.current_pin_config |= 0x40  # Set bit 6 for Dit priority
+            # Normal priority is both bits clear (0)
+            
+            # Send updated pin config
+            self.send_bytes([0x09, self.current_pin_config])
+            self.add_log_entry(
+                f"    Ultimatic priority: {self.ultimatic_priority.currentText()}", 
+                "sent"
+            )
+            self.add_log_entry(
+                f"    Pin config: 0x{self.current_pin_config:02X} "
+                f"({self.current_pin_config:08b})", 
+                "sent"
+            )
+        
         if self.send_bytes([0x0E, self.current_mode_register]):
             self.add_log_entry(
                 f"🔧 Set keyer mode: {self.keyer_mode_combo.currentText()}", 
                 "sent"
             )
-            if mode == 2:  # Ultimatic mode
-                self.add_log_entry(
-                    f"    Ultimatic priority: {self.ultimatic_priority.currentText()}", 
-                    "sent"
-                )
             self.add_log_entry(
                 f"    Mode register: 0x{self.current_mode_register:02X} "
                 f"({self.current_mode_register:08b})", 
@@ -825,8 +835,12 @@ class WK3Interface(QMainWindow):
             
         self.sidetone_enabled = not self.sidetone_enabled
         
-        # Set the appropriate value - Key 2 is always on (bit 2)
-        self.current_pin_config = 0x06 if self.sidetone_enabled else 0x04
+        # Update pin config while preserving Ultimatic priority bits
+        # Clear bit 1 (sidetone) first
+        self.current_pin_config &= ~0x02
+        # Then set it if enabled
+        if self.sidetone_enabled:
+            self.current_pin_config |= 0x02
         
         if self.send_bytes([0x09, self.current_pin_config]):
             self.add_log_entry(
