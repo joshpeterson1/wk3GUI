@@ -577,9 +577,11 @@ class WK3Interface(QMainWindow):
             keyer_mode_value = (self.current_mode_register & 0x30) >> 4
             self.keyer_mode_combo.setCurrentIndex(keyer_mode_value)
             
+            # Send default pin config: 0x06 (sidetone enabled, normal ultimatic priority)
+            self.current_pin_config = 0x06  # Bit 1 (sidetone) and bit 2 (Key 2) set
             self.send_bytes([0x09, self.current_pin_config])
             self.add_log_entry(
-                f"    Sent default pin config: 0x{self.current_pin_config:02X} (sidetone enabled)", 
+                f"    Sent default pin config: 0x{self.current_pin_config:02X} (sidetone enabled, normal ultimatic priority)", 
                 "sent"
             )
             
