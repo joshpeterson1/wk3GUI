@@ -131,7 +131,7 @@ class WK3Interface(QMainWindow):
         self.setFont(font)
         
         # Warning/instructions box
-        warning_box = QGroupBox("Requirements & Instructions")
+        warning_box = QGroupBox("Info")
         warning_layout = QVBoxLayout(warning_box)
         warning_text = QLabel(
             "<b>Requirements:</b> This application requires a WK3 device "
