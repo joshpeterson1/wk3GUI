@@ -26,7 +26,7 @@ It supports nearly all commonly used WKUSB settings and commands, and includes s
 3. *BEFORE* reporting any issues, close the program, unplug your WKUSB device, plug it back in and try again. Then email me :)
 
 ## Getting Started (Local; MAC/LIN)
-_Authored and tested on Python 3.12.10; Your mileage may very. Check out [pyenv](https://github.com/pyenv/pyenv) to try 3.12.10_
+_Authored and tested on Python 3.12.10; Your mileage may vary. Check out [pyenv](https://github.com/pyenv/pyenv) to try 3.12.10_
 1. Clone repo
 2. Extract and navigate to folder
 3. Run `python3 -m pip install -r requirements.txt`
