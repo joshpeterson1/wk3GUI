@@ -12,10 +12,10 @@ import serial.tools.list_ports
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QComboBox, QPushButton, 
     QVBoxLayout, QHBoxLayout, QWidget, QLabel, QTextEdit, 
-    QSlider, QCheckBox, QGroupBox, QLineEdit
+    QSlider, QCheckBox, QGroupBox, QLineEdit, QMenuBar, QMenu
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QKeyEvent
+from PyQt6.QtGui import QFont, QKeyEvent, QAction
 import pynput.keyboard as keyboard
 
 
@@ -112,6 +112,7 @@ class WK3Interface(QMainWindow):
         
         # Setup UI
         self.setup_ui()
+        self.setup_menu_bar()
         
         # Setup periodic port refresh
         self.port_refresh_timer = QTimer()
@@ -381,15 +382,6 @@ class WK3Interface(QMainWindow):
         
         main_layout.addWidget(self.debug_box)
         
-        # Keyboard shortcut hint
-        self.shortcut_label = QLabel("Press Shift+? for debug panel")
-        self.shortcut_label.setStyleSheet(
-            "background-color: rgba(0, 0, 0, 0.7); color: white; "
-            "padding: 8px 12px; border-radius: 8px;"
-        )
-        self.shortcut_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        main_layout.addWidget(self.shortcut_label)
-        
         # Connect signals
         self.connect_btn.clicked.connect(self.connect_to_device)
         self.disconnect_btn.clicked.connect(self.disconnect_from_device)
@@ -432,24 +424,123 @@ class WK3Interface(QMainWindow):
             style="color: #a0aec0; font-size: 12px;"
         )
         
-        # Install event filter for keyboard shortcuts
-        self.installEventFilter(self)
+    def setup_menu_bar(self):
+        """Set up the menu bar"""
+        menubar = self.menuBar()
         
-    def eventFilter(self, obj, event):
-        """Handle keyboard shortcuts"""
-        from PyQt6.QtCore import QEvent
+        # File menu
+        file_menu = menubar.addMenu('&File')
         
-        if event.type() == QEvent.Type.KeyPress:
-            # Check for Shift+?
-            if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier and 
-                event.key() == Qt.Key.Key_Question):
-                self.toggle_debug_panel()
-                return True
-        return super().eventFilter(obj, event)
+        # Connect action
+        connect_action = QAction('&Connect to Device', self)
+        connect_action.setShortcut('Ctrl+C')
+        connect_action.setStatusTip('Connect to WK3 device')
+        connect_action.triggered.connect(self.connect_to_device)
+        file_menu.addAction(connect_action)
+        
+        # Disconnect action
+        disconnect_action = QAction('&Disconnect', self)
+        disconnect_action.setShortcut('Ctrl+D')
+        disconnect_action.setStatusTip('Disconnect from WK3 device')
+        disconnect_action.triggered.connect(self.disconnect_from_device)
+        file_menu.addAction(disconnect_action)
+        
+        file_menu.addSeparator()
+        
+        # Exit action
+        exit_action = QAction('E&xit', self)
+        exit_action.setShortcut('Ctrl+Q')
+        exit_action.setStatusTip('Exit application')
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # Edit menu
+        edit_menu = menubar.addMenu('&Edit')
+        
+        # Clear ASCII Monitor action
+        clear_ascii_action = QAction('Clear &ASCII Monitor', self)
+        clear_ascii_action.setShortcut('Ctrl+A')
+        clear_ascii_action.setStatusTip('Clear the ASCII monitor display')
+        clear_ascii_action.triggered.connect(self.clear_ascii_monitor)
+        edit_menu.addAction(clear_ascii_action)
+        
+        # Clear Log action
+        clear_log_action = QAction('Clear &Log', self)
+        clear_log_action.setShortcut('Ctrl+L')
+        clear_log_action.setStatusTip('Clear the debug log')
+        clear_log_action.triggered.connect(self.clear_log)
+        edit_menu.addAction(clear_log_action)
+        
+        # View menu
+        view_menu = menubar.addMenu('&View')
+        
+        # Debug Panel toggle action
+        self.debug_panel_action = QAction('&Debug Panel', self)
+        self.debug_panel_action.setCheckable(True)
+        self.debug_panel_action.setShortcut('F12')
+        self.debug_panel_action.setStatusTip('Show/hide debug panel')
+        self.debug_panel_action.triggered.connect(self.toggle_debug_panel)
+        view_menu.addAction(self.debug_panel_action)
+        
+        # Tools menu
+        tools_menu = menubar.addMenu('&Tools')
+        
+        # Host Mode actions
+        open_host_action = QAction('&Open Host Mode', self)
+        open_host_action.setShortcut('Ctrl+O')
+        open_host_action.setStatusTip('Enter host mode on WK3 device')
+        open_host_action.triggered.connect(self.enter_host_mode)
+        tools_menu.addAction(open_host_action)
+        
+        close_host_action = QAction('&Close Host Mode', self)
+        close_host_action.setShortcut('Ctrl+Shift+O')
+        close_host_action.setStatusTip('Exit host mode on WK3 device')
+        close_host_action.triggered.connect(self.exit_host_mode)
+        tools_menu.addAction(close_host_action)
+        
+        tools_menu.addSeparator()
+        
+        # Test action
+        test_action = QAction('Run &Basic WK3 Test', self)
+        test_action.setShortcut('Ctrl+T')
+        test_action.setStatusTip('Run basic WK3 test sequence')
+        test_action.triggered.connect(self.test_wk3)
+        tools_menu.addAction(test_action)
+        
+        # Help menu
+        help_menu = menubar.addMenu('&Help')
+        
+        # About action
+        about_action = QAction('&About', self)
+        about_action.setStatusTip('About WK3 Device Interface')
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
         
     def toggle_debug_panel(self):
         """Toggle the visibility of the debug panel"""
-        self.debug_box.setVisible(not self.debug_box.isVisible())
+        is_visible = not self.debug_box.isVisible()
+        self.debug_box.setVisible(is_visible)
+        self.debug_panel_action.setChecked(is_visible)
+        
+    def show_about(self):
+        """Show the about dialog"""
+        from PyQt6.QtWidgets import QMessageBox
+        
+        about_text = """
+        <h3>WK3 Device Interface</h3>
+        <p><b>Version:</b> 1.0</p>
+        <p><b>Description:</b> Python GUI application for communicating with WK3 Morse code keyer devices.</p>
+        <p><b>Features:</b></p>
+        <ul>
+        <li>Full WK3 protocol support</li>
+        <li>Real-time paddle echo and keyboard emulation</li>
+        <li>Complete control over WKMode and PinCFG registers</li>
+        <li>Debug panel for advanced users</li>
+        </ul>
+        <p><b>Requirements:</b> WK3 device connected via serial port</p>
+        """
+        
+        QMessageBox.about(self, "About WK3 Device Interface", about_text)
         
     def refresh_ports(self):
         """Refresh the list of available serial ports"""
