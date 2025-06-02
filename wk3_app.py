@@ -334,9 +334,13 @@ class WK3Interface(QMainWindow):
         # Keyboard emulation controls
         emulation_layout = QHBoxLayout()
         self.keyboard_emulation_cb = QCheckBox("Enable Keyboard Emulation")
+        self.caps_lock_cb = QCheckBox("CAPS LOCK")
+        self.caps_lock_cb.setVisible(False)  # Hidden by default
+        self.caps_lock_cb.setChecked(True)   # Default to uppercase (matching WK3 output)
         self.emulation_status = QLabel("")
         
         emulation_layout.addWidget(self.keyboard_emulation_cb)
+        emulation_layout.addWidget(self.caps_lock_cb)
         emulation_layout.addWidget(self.emulation_status)
         monitor_layout.addLayout(emulation_layout)
         
@@ -399,6 +403,7 @@ class WK3Interface(QMainWindow):
         self.close_host_btn.clicked.connect(self.exit_host_mode)
         self.clear_ascii_btn.clicked.connect(self.clear_ascii_monitor)
         self.keyboard_emulation_cb.stateChanged.connect(self.toggle_keyboard_emulation)
+        self.caps_lock_cb.stateChanged.connect(self.toggle_caps_lock)
         self.wpm_slider.valueChanged.connect(self.update_wpm_display)
         self.set_wpm_btn.clicked.connect(self.set_wpm)
         self.keycomp_slider.valueChanged.connect(self.update_keycomp_display)
@@ -881,9 +886,17 @@ class WK3Interface(QMainWindow):
                 self.keyboard_controller.release(keyboard.Key.space)
                 self.emulation_status.setText("Last key: [SPACE]")
             elif len(char) == 1 and 32 <= ord(char) <= 126:
+                # Apply caps lock setting to alphabetic characters
+                output_char = char
+                if char.isalpha():
+                    if self.caps_lock_cb.isChecked():
+                        output_char = char.upper()
+                    else:
+                        output_char = char.lower()
+                
                 # Send printable ASCII characters
-                self.keyboard_controller.type(char)
-                self.emulation_status.setText(f"Last key: {char}")
+                self.keyboard_controller.type(output_char)
+                self.emulation_status.setText(f"Last key: {output_char}")
             else:
                 # For other characters, try to type them directly
                 self.keyboard_controller.type(char)
@@ -901,12 +914,21 @@ class WK3Interface(QMainWindow):
             self.emulation_status.setText("🎹 Active - Paddle input will be typed system-wide")
             self.emulation_status.setStyleSheet("color: #48bb78; font-weight: bold;")
             self.keyboard_emulation_cb.setText("Disable Keyboard Emulation")
+            self.caps_lock_cb.setVisible(True)  # Show caps lock checkbox
             self.add_log_entry("🎹 Keyboard emulation enabled", "connected")
         else:
             self.emulation_status.setText("⏸️ Inactive")
             self.emulation_status.setStyleSheet("color: #a0aec0;")
             self.keyboard_emulation_cb.setText("Enable Keyboard Emulation")
+            self.caps_lock_cb.setVisible(False)  # Hide caps lock checkbox
             self.add_log_entry("⏸️ Keyboard emulation disabled", "disconnected")
+            
+    def toggle_caps_lock(self, state):
+        """Toggle caps lock for keyboard emulation"""
+        from PyQt6.QtCore import Qt
+        caps_enabled = (state == Qt.CheckState.Checked.value)
+        case_mode = "UPPERCASE" if caps_enabled else "lowercase"
+        self.add_log_entry(f"🔤 Keyboard emulation case mode: {case_mode}", "connected")
             
     def clear_ascii_monitor(self):
         """Clear the ASCII monitor"""
