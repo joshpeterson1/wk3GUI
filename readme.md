@@ -2,6 +2,9 @@
 
 🔗 **Live site:** [https://wkusb-gui.glitch.me/](https://wkusb-gui.glitch.me/)
 
+## Visual Overview
+[Full Walkthrough](https://somber.wistia.com/medias/tcwperoit9)
+
 ## Overview
 
 **WKUSB GUI** is a cross-platform application for controlling and configuring a **WKUSB Morse keyer** device, either through a web interface or a local Python GUI.
