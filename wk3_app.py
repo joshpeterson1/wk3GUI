@@ -82,13 +82,24 @@ class WK3Interface(QMainWindow):
         # WK3 state variables
         self.current_mode_register = 0x50  # Default: 01010000 - Iambic A mode
         self.current_pin_config = 0x06  # Default: 00000110 - Normal ult, 1ws+1dit hangtime, keyout2 on, sidetone on
-        self.paddle_swapped = False
-        self.sidetone_enabled = True
-        self.ultimatic_priority = 0  # 0=Normal, 1=Dah Priority, 2=Dit Priority
-        self.hangtime_setting = 0  # 0=1ws+1dit, 1=1ws+2dit, 2=1ws+4dit, 3=1ws+8dit
-        self.keyout1_enabled = False
-        self.keyout2_enabled = True
-        self.ptt_enabled = False
+        
+        # WKMode register bits (from default 0x50 = 01010000)
+        self.paddle_watchdog_disabled = False  # Bit 7: 0 = enabled
+        self.paddle_echo_enabled = True        # Bit 6: 1 = enabled
+        self.keyer_mode = 1                    # Bits 5,4: 01 = Iambic A
+        self.paddle_swapped = False            # Bit 3: 0 = normal
+        self.serial_echo_enabled = False       # Bit 2: 0 = disabled
+        self.autospace_enabled = False         # Bit 1: 0 = disabled
+        self.contest_spacing_enabled = False   # Bit 0: 0 = disabled
+        
+        # PinCFG register bits (from default 0x06 = 00000110)
+        self.ultimatic_priority = 0  # Bits 7,6: 0=Normal, 1=Dah Priority, 2=Dit Priority
+        self.hangtime_setting = 0    # Bits 5,4: 0=1ws+1dit, 1=1ws+2dit, 2=1ws+4dit, 3=1ws+8dit
+        self.keyout1_enabled = False # Bit 3: 0 = disabled
+        self.keyout2_enabled = True  # Bit 2: 1 = enabled
+        self.sidetone_enabled = True # Bit 1: 1 = enabled
+        self.ptt_enabled = False     # Bit 0: 0 = disabled
+        
         self.host_mode_active = False
         self.current_wpm = 20  # Default 20 WPM
         self.current_key_comp = 50  # Default 50ms key compensation
@@ -261,6 +272,40 @@ class WK3Interface(QMainWindow):
         
         controls_layout.addWidget(pincfg_box)
         
+        # WKMode controls
+        wkmode_box = QGroupBox("WKMode Settings")
+        wkmode_layout = QVBoxLayout(wkmode_box)
+        
+        # First row: Paddle controls
+        paddle_layout = QHBoxLayout()
+        self.paddle_watchdog_cb = QCheckBox("Disable Paddle Watchdog")
+        self.paddle_echo_cb = QCheckBox("Paddle Echo")
+        self.paddle_echo_cb.setChecked(True)  # Default enabled
+        
+        self.paddle_watchdog_cb.setEnabled(False)
+        self.paddle_echo_cb.setEnabled(False)
+        
+        paddle_layout.addWidget(self.paddle_watchdog_cb)
+        paddle_layout.addWidget(self.paddle_echo_cb)
+        wkmode_layout.addLayout(paddle_layout)
+        
+        # Second row: Communication controls
+        comm_layout = QHBoxLayout()
+        self.serial_echo_cb = QCheckBox("Serial Echo Back")
+        self.autospace_cb = QCheckBox("Autospace")
+        self.contest_spacing_cb = QCheckBox("Contest Spacing")
+        
+        self.serial_echo_cb.setEnabled(False)
+        self.autospace_cb.setEnabled(False)
+        self.contest_spacing_cb.setEnabled(False)
+        
+        comm_layout.addWidget(self.serial_echo_cb)
+        comm_layout.addWidget(self.autospace_cb)
+        comm_layout.addWidget(self.contest_spacing_cb)
+        wkmode_layout.addLayout(comm_layout)
+        
+        controls_layout.addWidget(wkmode_box)
+        
         main_layout.addWidget(controls_box)
         
         # Status display
@@ -364,6 +409,11 @@ class WK3Interface(QMainWindow):
         self.keyout1_cb.stateChanged.connect(self.toggle_keyout1)
         self.keyout2_cb.stateChanged.connect(self.toggle_keyout2)
         self.ptt_cb.stateChanged.connect(self.toggle_ptt)
+        self.paddle_watchdog_cb.stateChanged.connect(self.toggle_paddle_watchdog)
+        self.paddle_echo_cb.stateChanged.connect(self.toggle_paddle_echo)
+        self.serial_echo_cb.stateChanged.connect(self.toggle_serial_echo)
+        self.autospace_cb.stateChanged.connect(self.toggle_autospace)
+        self.contest_spacing_cb.stateChanged.connect(self.toggle_contest_spacing)
         self.send_cmd_btn.clicked.connect(self.send_command)
         self.clear_log_btn.clicked.connect(self.clear_log)
         self.test_wk3_btn.clicked.connect(self.test_wk3)
@@ -377,7 +427,7 @@ class WK3Interface(QMainWindow):
             "• Echo backs: 0x00-0x7F (responses to commands)\n\n"
             "WK3 Controls Available:\n"
             "• Keyer Modes: Iambic A/B, Ultimatic, Bug\n"
-            "• Paddle swap and Ultimatic priority\n"
+            "• WKMode (0x0E): Bits 7=PaddleWD, 6=PaddleEcho, 5,4=Mode, 3=PaddleSwap, 2=SerialEcho, 1=Autospace, 0=ContestSpace\n"
             "• PinCFG (0x09): Bits 7,6=Ult Pri, 5,4=Hangtime, 3=KeyOut1, 2=KeyOut2, 1=Sidetone, 0=PTT",
             style="color: #a0aec0; font-size: 12px;"
         )
@@ -606,6 +656,15 @@ class WK3Interface(QMainWindow):
             self.current_mode_register = 0x50  # Default to Iambic A mode (01010000)
             self.current_pin_config = 0x06     # Default: 00000110
             
+            # Parse the default mode register 0x50 (01010000)
+            self.paddle_watchdog_disabled = bool(self.current_mode_register & 0x80)  # Bit 7
+            self.paddle_echo_enabled = bool(self.current_mode_register & 0x40)       # Bit 6
+            self.keyer_mode = (self.current_mode_register >> 4) & 0x03               # Bits 5,4
+            self.paddle_swapped = bool(self.current_mode_register & 0x08)            # Bit 3
+            self.serial_echo_enabled = bool(self.current_mode_register & 0x04)       # Bit 2
+            self.autospace_enabled = bool(self.current_mode_register & 0x02)         # Bit 1
+            self.contest_spacing_enabled = bool(self.current_mode_register & 0x01)   # Bit 0
+            
             # Parse the default pin config 0x06 (00000110)
             self.ultimatic_priority = (self.current_pin_config >> 6) & 0x03  # Bits 7,6
             self.hangtime_setting = (self.current_pin_config >> 4) & 0x03    # Bits 5,4
@@ -622,8 +681,12 @@ class WK3Interface(QMainWindow):
             )
             
             # Update UI based on default mode register
-            keyer_mode_value = (self.current_mode_register & 0x30) >> 4
-            self.keyer_mode_combo.setCurrentIndex(keyer_mode_value)
+            self.keyer_mode_combo.setCurrentIndex(self.keyer_mode)
+            self.paddle_watchdog_cb.setChecked(self.paddle_watchdog_disabled)
+            self.paddle_echo_cb.setChecked(self.paddle_echo_enabled)
+            self.serial_echo_cb.setChecked(self.serial_echo_enabled)
+            self.autospace_cb.setChecked(self.autospace_enabled)
+            self.contest_spacing_cb.setChecked(self.contest_spacing_enabled)
             
             # Send default pin config: 0x06
             self.send_bytes([0x09, self.current_pin_config])
@@ -731,6 +794,11 @@ class WK3Interface(QMainWindow):
         self.keyout1_cb.setEnabled(self.host_mode_active)
         self.keyout2_cb.setEnabled(self.host_mode_active)
         self.ptt_cb.setEnabled(self.host_mode_active)
+        self.paddle_watchdog_cb.setEnabled(self.host_mode_active)
+        self.paddle_echo_cb.setEnabled(self.host_mode_active)
+        self.serial_echo_cb.setEnabled(self.host_mode_active)
+        self.autospace_cb.setEnabled(self.host_mode_active)
+        self.contest_spacing_cb.setEnabled(self.host_mode_active)
         self.wpm_slider.setEnabled(self.host_mode_active)
         self.set_wpm_btn.setEnabled(self.host_mode_active)
         self.keycomp_slider.setEnabled(self.host_mode_active)
@@ -750,7 +818,9 @@ class WK3Interface(QMainWindow):
             for btn in [self.paddle_swap_btn, self.sidetone_btn]:
                 btn.setStyleSheet("")
             self.keyer_mode_combo.setStyleSheet("")
-            for cb in [self.keyout1_cb, self.keyout2_cb, self.ptt_cb]:
+            for cb in [self.keyout1_cb, self.keyout2_cb, self.ptt_cb, 
+                      self.paddle_watchdog_cb, self.paddle_echo_cb, 
+                      self.serial_echo_cb, self.autospace_cb, self.contest_spacing_cb]:
                 cb.setStyleSheet("")
         else:
             self.status_label.setText("Connected")
@@ -759,7 +829,9 @@ class WK3Interface(QMainWindow):
             for btn in [self.paddle_swap_btn, self.sidetone_btn]:
                 btn.setStyleSheet("opacity: 0.5;")
             self.keyer_mode_combo.setStyleSheet("opacity: 0.5;")
-            for cb in [self.keyout1_cb, self.keyout2_cb, self.ptt_cb]:
+            for cb in [self.keyout1_cb, self.keyout2_cb, self.ptt_cb,
+                      self.paddle_watchdog_cb, self.paddle_echo_cb,
+                      self.serial_echo_cb, self.autospace_cb, self.contest_spacing_cb]:
                 cb.setStyleSheet("opacity: 0.5;")
             
     def update_wpm_display(self):
@@ -821,16 +893,8 @@ class WK3Interface(QMainWindow):
             
         mode = self.keyer_mode_combo.currentIndex()
         
-        # Map the mode value to the correct bit pattern
-        mode_values = [0x40, 0x50, 0x60, 0x70]  # Iambic B, Iambic A, Ultimatic, Bug
-        mode_value = mode_values[mode]
-        
-        # Preserve paddle swap setting
-        if self.paddle_swapped:
-            mode_value |= 0x08  # Set bit 3 (paddle swap)
-            
-        # Preserve other bits (bit 7)
-        self.current_mode_register = (self.current_mode_register & 0x80) | (mode_value & 0x7F)
+        # Update the keyer mode in our state
+        self.keyer_mode = mode
         
         # For Ultimatic mode, handle the priority setting in pin config
         if mode == 2:  # Ultimatic mode
@@ -841,17 +905,55 @@ class WK3Interface(QMainWindow):
                 "sent"
             )
         
+        # Update the full WKMode register
+        self.update_wkmode_register()
+        
+        self.add_log_entry(
+            f"🔧 Set keyer mode: {self.keyer_mode_combo.currentText()}", 
+            "sent"
+        )
+            
+    def update_wkmode_register(self):
+        """Update and send the WKMode register based on current settings"""
+        # Build the mode register byte from individual settings
+        mode_register = 0
+        
+        # Bit 7: Disable paddle watchdog
+        if self.paddle_watchdog_disabled:
+            mode_register |= 0x80
+            
+        # Bit 6: Paddle echo
+        if self.paddle_echo_enabled:
+            mode_register |= 0x40
+            
+        # Bits 5,4: Keyer mode (00=Iambic B, 01=Iambic A, 10=Ultimatic, 11=Bug)
+        mode_register |= (self.keyer_mode & 0x03) << 4
+        
+        # Bit 3: Paddle swap
+        if self.paddle_swapped:
+            mode_register |= 0x08
+            
+        # Bit 2: Serial echo back
+        if self.serial_echo_enabled:
+            mode_register |= 0x04
+            
+        # Bit 1: Autospace
+        if self.autospace_enabled:
+            mode_register |= 0x02
+            
+        # Bit 0: Contest spacing
+        if self.contest_spacing_enabled:
+            mode_register |= 0x01
+            
+        self.current_mode_register = mode_register
+        
         if self.send_bytes([0x0E, self.current_mode_register]):
             self.add_log_entry(
-                f"🔧 Set keyer mode: {self.keyer_mode_combo.currentText()}", 
-                "sent"
-            )
-            self.add_log_entry(
-                f"    Mode register: 0x{self.current_mode_register:02X} "
+                f"    WKMode register: 0x{self.current_mode_register:02X} "
                 f"({self.current_mode_register:08b})", 
                 "sent"
             )
-            
+
     def toggle_paddle_swap(self):
         """Toggle paddle swap on the WK3 device"""
         if not self.host_mode_active:
@@ -859,24 +961,11 @@ class WK3Interface(QMainWindow):
             return
             
         self.paddle_swapped = not self.paddle_swapped
-        
-        # Toggle bit 3 (Paddle Swap) while preserving other bits
-        if self.paddle_swapped:
-            self.current_mode_register |= 0x08  # Set bit 3
-        else:
-            self.current_mode_register &= ~0x08  # Clear bit 3
-            
-        if self.send_bytes([0x0E, self.current_mode_register]):
-            self.add_log_entry(
-                f"🔄 Paddle swap: {'ON' if self.paddle_swapped else 'OFF'}", 
-                "sent"
-            )
-            self.add_log_entry(
-                f"    Mode register: 0x{self.current_mode_register:02X} "
-                f"({self.current_mode_register:08b})", 
-                "sent"
-            )
-            
+        self.update_wkmode_register()
+        self.add_log_entry(
+            f"🔄 Paddle swap: {'ON' if self.paddle_swapped else 'OFF'}", 
+            "sent"
+        )
         self.update_paddle_swap_display()
             
     def toggle_sidetone(self):
@@ -1010,6 +1099,81 @@ class WK3Interface(QMainWindow):
         self.update_pin_config()
         self.add_log_entry(
             f"📡 PTT: {'ON' if self.ptt_enabled else 'OFF'}", 
+            "sent"
+        )
+        
+    def toggle_paddle_watchdog(self, state):
+        """Toggle paddle watchdog disable"""
+        if not self.host_mode_active:
+            self.add_log_entry("⚠️ Must be in host mode to change settings", "error")
+            self.paddle_watchdog_cb.setChecked(self.paddle_watchdog_disabled)  # Revert checkbox
+            return
+            
+        from PyQt6.QtCore import Qt
+        self.paddle_watchdog_disabled = (state == Qt.CheckState.Checked.value)
+        self.update_wkmode_register()
+        self.add_log_entry(
+            f"⏰ Paddle Watchdog: {'DISABLED' if self.paddle_watchdog_disabled else 'ENABLED'}", 
+            "sent"
+        )
+        
+    def toggle_paddle_echo(self, state):
+        """Toggle paddle echo"""
+        if not self.host_mode_active:
+            self.add_log_entry("⚠️ Must be in host mode to change settings", "error")
+            self.paddle_echo_cb.setChecked(self.paddle_echo_enabled)  # Revert checkbox
+            return
+            
+        from PyQt6.QtCore import Qt
+        self.paddle_echo_enabled = (state == Qt.CheckState.Checked.value)
+        self.update_wkmode_register()
+        self.add_log_entry(
+            f"🔊 Paddle Echo: {'ON' if self.paddle_echo_enabled else 'OFF'}", 
+            "sent"
+        )
+        
+    def toggle_serial_echo(self, state):
+        """Toggle serial echo back"""
+        if not self.host_mode_active:
+            self.add_log_entry("⚠️ Must be in host mode to change settings", "error")
+            self.serial_echo_cb.setChecked(self.serial_echo_enabled)  # Revert checkbox
+            return
+            
+        from PyQt6.QtCore import Qt
+        self.serial_echo_enabled = (state == Qt.CheckState.Checked.value)
+        self.update_wkmode_register()
+        self.add_log_entry(
+            f"📡 Serial Echo Back: {'ON' if self.serial_echo_enabled else 'OFF'}", 
+            "sent"
+        )
+        
+    def toggle_autospace(self, state):
+        """Toggle autospace"""
+        if not self.host_mode_active:
+            self.add_log_entry("⚠️ Must be in host mode to change settings", "error")
+            self.autospace_cb.setChecked(self.autospace_enabled)  # Revert checkbox
+            return
+            
+        from PyQt6.QtCore import Qt
+        self.autospace_enabled = (state == Qt.CheckState.Checked.value)
+        self.update_wkmode_register()
+        self.add_log_entry(
+            f"📝 Autospace: {'ON' if self.autospace_enabled else 'OFF'}", 
+            "sent"
+        )
+        
+    def toggle_contest_spacing(self, state):
+        """Toggle contest spacing"""
+        if not self.host_mode_active:
+            self.add_log_entry("⚠️ Must be in host mode to change settings", "error")
+            self.contest_spacing_cb.setChecked(self.contest_spacing_enabled)  # Revert checkbox
+            return
+            
+        from PyQt6.QtCore import Qt
+        self.contest_spacing_enabled = (state == Qt.CheckState.Checked.value)
+        self.update_wkmode_register()
+        self.add_log_entry(
+            f"🏆 Contest Spacing: {'ON' if self.contest_spacing_enabled else 'OFF'}", 
             "sent"
         )
             
