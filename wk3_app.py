@@ -15,8 +15,9 @@ from PyQt6.QtWidgets import (
     QSlider, QCheckBox, QGroupBox, QLineEdit, QMenuBar, QMenu
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QKeyEvent, QAction
+from PyQt6.QtGui import QFont, QKeyEvent, QAction, QIcon, QPixmap
 import pynput.keyboard as keyboard
+import os
 
 
 class SerialThread(QThread):
@@ -74,6 +75,9 @@ class WK3Interface(QMainWindow):
         self.setWindowTitle("WK3 Device Interface")
         self.resize(800, 600)
         
+        # Set application icon
+        self.set_application_icon()
+        
         # Serial connection variables
         self.serial_thread = None
         self.keyboard_controller = keyboard.Controller()
@@ -118,6 +122,24 @@ class WK3Interface(QMainWindow):
         self.port_refresh_timer = QTimer()
         self.port_refresh_timer.timeout.connect(self.refresh_ports)
         self.port_refresh_timer.start(5000)  # Refresh every 5 seconds
+        
+    def set_application_icon(self):
+        """Set the application icon using available logo files"""
+        # Try different icon files in order of preference
+        icon_files = ['logo.ico', 'sqlogo.png', 'logo.png']
+        
+        for icon_file in icon_files:
+            if os.path.exists(icon_file):
+                try:
+                    icon = QIcon(icon_file)
+                    if not icon.isNull():
+                        self.setWindowIcon(icon)
+                        # Also set it for the application (taskbar, etc.)
+                        QApplication.instance().setWindowIcon(icon)
+                        break
+                except Exception as e:
+                    print(f"Failed to load icon {icon_file}: {e}")
+                    continue
         
     def setup_ui(self):
         """Set up the user interface"""
@@ -563,7 +585,28 @@ class WK3Interface(QMainWindow):
         <p><b>Requirements:</b> WK3 device connected via serial port</p>
         """
         
-        QMessageBox.about(self, "About WK3 Device Interface", about_text)
+        # Create message box with custom icon
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("About WK3 Device Interface")
+        msg_box.setText(about_text)
+        
+        # Try to set a custom icon for the about dialog
+        icon_files = ['logo.png', 'sqlogo.png', 'logo.ico']
+        for icon_file in icon_files:
+            if os.path.exists(icon_file):
+                try:
+                    pixmap = QPixmap(icon_file)
+                    if not pixmap.isNull():
+                        # Scale the pixmap to a reasonable size for the dialog
+                        scaled_pixmap = pixmap.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, 
+                                                    Qt.TransformationMode.SmoothTransformation)
+                        msg_box.setIconPixmap(scaled_pixmap)
+                        break
+                except Exception as e:
+                    print(f"Failed to load about dialog icon {icon_file}: {e}")
+                    continue
+        
+        msg_box.exec()
         
     def toggle_advanced_settings(self):
         """Toggle the visibility of advanced settings (PinCFG and WKMode)"""
