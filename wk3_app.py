@@ -102,7 +102,7 @@ class WK3Interface(QMainWindow):
         
         self.host_mode_active = False
         self.current_wpm = 20  # Default 20 WPM
-        self.current_key_comp = 50  # Default 50ms key compensation
+        self.current_key_comp = 25  # Default 25ms key compensation
         
         # Command tracking variables
         self.last_command_byte = None
@@ -198,7 +198,7 @@ class WK3Interface(QMainWindow):
         # WPM controls
         wpm_layout = QHBoxLayout()
         self.wpm_slider = QSlider(Qt.Orientation.Horizontal)
-        self.wpm_slider.setRange(5, 99)
+        self.wpm_slider.setRange(5, 50)
         self.wpm_slider.setValue(20)
         self.wpm_label = QLabel("20 WPM")
         self.set_wpm_btn = QPushButton("Set Speed")
@@ -216,8 +216,8 @@ class WK3Interface(QMainWindow):
         keycomp_layout = QHBoxLayout()
         self.keycomp_slider = QSlider(Qt.Orientation.Horizontal)
         self.keycomp_slider.setRange(0, 50)
-        self.keycomp_slider.setValue(50)
-        self.keycomp_label = QLabel("50 ms")
+        self.keycomp_slider.setValue(25)
+        self.keycomp_label = QLabel("25 ms")
         self.set_keycomp_btn = QPushButton("Set Compensation")
         
         self.keycomp_slider.setEnabled(False)
@@ -825,9 +825,9 @@ class WK3Interface(QMainWindow):
             self.send_bytes([0x02, 0x14])
             self.add_log_entry(f"    Sent default speed: 20 WPM (0x14)", "sent")
             
-            # Send default Key Compensation (50ms = 0x32 in hex)
-            self.send_bytes([0x11, 0x32])
-            self.add_log_entry(f"    Sent default key compensation: 50 ms (0x32)", "sent")
+            # Send default Key Compensation (25ms = 0x19 in hex)
+            self.send_bytes([0x11, 0x19])
+            self.add_log_entry(f"    Sent default key compensation: 25 ms (0x19)", "sent")
             
             self.update_paddle_swap_display()
             self.update_sidetone_display()
