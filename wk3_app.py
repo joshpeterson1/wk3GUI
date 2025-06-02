@@ -81,10 +81,14 @@ class WK3Interface(QMainWindow):
         
         # WK3 state variables
         self.current_mode_register = 0x50  # Default: 01010000 - Iambic A mode
-        self.current_pin_config = 0x06  # Default: Key 2 on (bit 2) and sidetone on (bit 1)
+        self.current_pin_config = 0x06  # Default: 00000110 - Normal ult, 1ws+1dit hangtime, keyout2 on, sidetone on
         self.paddle_swapped = False
         self.sidetone_enabled = True
         self.ultimatic_priority = 0  # 0=Normal, 1=Dah Priority, 2=Dit Priority
+        self.hangtime_setting = 0  # 0=1ws+1dit, 1=1ws+2dit, 2=1ws+4dit, 3=1ws+8dit
+        self.keyout1_enabled = False
+        self.keyout2_enabled = True
+        self.ptt_enabled = False
         self.host_mode_active = False
         self.current_wpm = 20  # Default 20 WPM
         self.current_key_comp = 50  # Default 50ms key compensation
@@ -217,13 +221,45 @@ class WK3Interface(QMainWindow):
         self.ultimatic_box = QGroupBox("Ultimatic Settings")
         self.ultimatic_box.setVisible(False)
         ultimatic_layout = QHBoxLayout(self.ultimatic_box)
-        self.ultimatic_priority = QComboBox()
-        self.ultimatic_priority.addItems(["Normal", "Dah Priority", "Dit Priority"])
-        self.ultimatic_priority.setEnabled(False)
+        self.ultimatic_priority_combo = QComboBox()
+        self.ultimatic_priority_combo.addItems(["Normal", "Dah Priority", "Dit Priority"])
+        self.ultimatic_priority_combo.setEnabled(False)
         
         ultimatic_layout.addWidget(QLabel("Ultimatic Priority:"))
-        ultimatic_layout.addWidget(self.ultimatic_priority)
+        ultimatic_layout.addWidget(self.ultimatic_priority_combo)
         controls_layout.addWidget(self.ultimatic_box)
+        
+        # PinCFG controls
+        pincfg_box = QGroupBox("PinCFG Settings")
+        pincfg_layout = QVBoxLayout(pincfg_box)
+        
+        # Hangtime controls
+        hangtime_layout = QHBoxLayout()
+        self.hangtime_combo = QComboBox()
+        self.hangtime_combo.addItems(["1 wordspace + 1 dit", "1 wordspace + 2 dits", "1 wordspace + 4 dits", "1 wordspace + 8 dits"])
+        self.hangtime_combo.setEnabled(False)
+        
+        hangtime_layout.addWidget(QLabel("Hangtime:"))
+        hangtime_layout.addWidget(self.hangtime_combo)
+        pincfg_layout.addLayout(hangtime_layout)
+        
+        # Key output controls
+        keyout_layout = QHBoxLayout()
+        self.keyout1_cb = QCheckBox("Key Out 1")
+        self.keyout2_cb = QCheckBox("Key Out 2")
+        self.keyout2_cb.setChecked(True)  # Default enabled
+        self.ptt_cb = QCheckBox("PTT Enable")
+        
+        self.keyout1_cb.setEnabled(False)
+        self.keyout2_cb.setEnabled(False)
+        self.ptt_cb.setEnabled(False)
+        
+        keyout_layout.addWidget(self.keyout1_cb)
+        keyout_layout.addWidget(self.keyout2_cb)
+        keyout_layout.addWidget(self.ptt_cb)
+        pincfg_layout.addLayout(keyout_layout)
+        
+        controls_layout.addWidget(pincfg_box)
         
         main_layout.addWidget(controls_box)
         
@@ -321,9 +357,13 @@ class WK3Interface(QMainWindow):
         self.keycomp_slider.valueChanged.connect(self.update_keycomp_display)
         self.set_keycomp_btn.clicked.connect(self.set_keycomp)
         self.keyer_mode_combo.currentIndexChanged.connect(self.update_ultimatic_controls)
-        self.ultimatic_priority.currentIndexChanged.connect(self.set_keyer_mode)
+        self.ultimatic_priority_combo.currentIndexChanged.connect(self.set_keyer_mode)
         self.paddle_swap_btn.clicked.connect(self.toggle_paddle_swap)
         self.sidetone_btn.clicked.connect(self.toggle_sidetone)
+        self.hangtime_combo.currentIndexChanged.connect(self.set_hangtime)
+        self.keyout1_cb.stateChanged.connect(self.toggle_keyout1)
+        self.keyout2_cb.stateChanged.connect(self.toggle_keyout2)
+        self.ptt_cb.stateChanged.connect(self.toggle_ptt)
         self.send_cmd_btn.clicked.connect(self.send_command)
         self.clear_log_btn.clicked.connect(self.clear_log)
         self.test_wk3_btn.clicked.connect(self.test_wk3)
@@ -338,7 +378,7 @@ class WK3Interface(QMainWindow):
             "WK3 Controls Available:\n"
             "• Keyer Modes: Iambic A/B, Ultimatic, Bug\n"
             "• Paddle swap and Ultimatic priority\n"
-            "• Sidetone enable/disable (PinConfig bit 1)",
+            "• PinCFG (0x09): Bits 7,6=Ult Pri, 5,4=Hangtime, 3=KeyOut1, 2=KeyOut2, 1=Sidetone, 0=PTT",
             style="color: #a0aec0; font-size: 12px;"
         )
         
@@ -564,7 +604,15 @@ class WK3Interface(QMainWindow):
             
             # Set default values for registers
             self.current_mode_register = 0x50  # Default to Iambic A mode (01010000)
-            self.current_pin_config = 0x06     # Default with Key 2 on and sidetone enabled
+            self.current_pin_config = 0x06     # Default: 00000110
+            
+            # Parse the default pin config 0x06 (00000110)
+            self.ultimatic_priority = (self.current_pin_config >> 6) & 0x03  # Bits 7,6
+            self.hangtime_setting = (self.current_pin_config >> 4) & 0x03    # Bits 5,4
+            self.keyout1_enabled = bool(self.current_pin_config & 0x08)      # Bit 3
+            self.keyout2_enabled = bool(self.current_pin_config & 0x04)      # Bit 2
+            self.sidetone_enabled = bool(self.current_pin_config & 0x02)     # Bit 1
+            self.ptt_enabled = bool(self.current_pin_config & 0x01)          # Bit 0
             
             # Send these default values to the device to ensure sync
             self.send_bytes([0x0E, self.current_mode_register])
@@ -577,13 +625,22 @@ class WK3Interface(QMainWindow):
             keyer_mode_value = (self.current_mode_register & 0x30) >> 4
             self.keyer_mode_combo.setCurrentIndex(keyer_mode_value)
             
-            # Send default pin config: 0x06 (sidetone enabled, normal ultimatic priority)
-            self.current_pin_config = 0x06  # Bit 1 (sidetone) and bit 2 (Key 2) set
+            # Send default pin config: 0x06
             self.send_bytes([0x09, self.current_pin_config])
             self.add_log_entry(
-                f"    Sent default pin config: 0x{self.current_pin_config:02X} (sidetone enabled, normal ultimatic priority)", 
+                f"    Sent default pin config: 0x{self.current_pin_config:02X} "
+                f"(Ult:{self.ultimatic_priority}, Hang:{self.hangtime_setting}, "
+                f"K1:{self.keyout1_enabled}, K2:{self.keyout2_enabled}, "
+                f"ST:{self.sidetone_enabled}, PTT:{self.ptt_enabled})", 
                 "sent"
             )
+            
+            # Update UI controls to match the parsed values
+            self.ultimatic_priority_combo.setCurrentIndex(self.ultimatic_priority)
+            self.hangtime_combo.setCurrentIndex(self.hangtime_setting)
+            self.keyout1_cb.setChecked(self.keyout1_enabled)
+            self.keyout2_cb.setChecked(self.keyout2_enabled)
+            self.ptt_cb.setChecked(self.ptt_enabled)
             
             # Send default WPM (20 WPM = 0x14 in hex)
             self.send_bytes([0x02, 0x14])
@@ -669,7 +726,11 @@ class WK3Interface(QMainWindow):
         self.keyer_mode_combo.setEnabled(self.host_mode_active)
         self.paddle_swap_btn.setEnabled(self.host_mode_active)
         self.sidetone_btn.setEnabled(self.host_mode_active)
-        self.ultimatic_priority.setEnabled(self.host_mode_active)
+        self.ultimatic_priority_combo.setEnabled(self.host_mode_active)
+        self.hangtime_combo.setEnabled(self.host_mode_active)
+        self.keyout1_cb.setEnabled(self.host_mode_active)
+        self.keyout2_cb.setEnabled(self.host_mode_active)
+        self.ptt_cb.setEnabled(self.host_mode_active)
         self.wpm_slider.setEnabled(self.host_mode_active)
         self.set_wpm_btn.setEnabled(self.host_mode_active)
         self.keycomp_slider.setEnabled(self.host_mode_active)
@@ -689,6 +750,8 @@ class WK3Interface(QMainWindow):
             for btn in [self.paddle_swap_btn, self.sidetone_btn]:
                 btn.setStyleSheet("")
             self.keyer_mode_combo.setStyleSheet("")
+            for cb in [self.keyout1_cb, self.keyout2_cb, self.ptt_cb]:
+                cb.setStyleSheet("")
         else:
             self.status_label.setText("Connected")
             
@@ -696,6 +759,8 @@ class WK3Interface(QMainWindow):
             for btn in [self.paddle_swap_btn, self.sidetone_btn]:
                 btn.setStyleSheet("opacity: 0.5;")
             self.keyer_mode_combo.setStyleSheet("opacity: 0.5;")
+            for cb in [self.keyout1_cb, self.keyout2_cb, self.ptt_cb]:
+                cb.setStyleSheet("opacity: 0.5;")
             
     def update_wpm_display(self):
         """Update the WPM display when the slider changes"""
@@ -769,25 +834,10 @@ class WK3Interface(QMainWindow):
         
         # For Ultimatic mode, handle the priority setting in pin config
         if mode == 2:  # Ultimatic mode
-            self.ultimatic_priority = self.ultimatic_priority.currentIndex()
-            # Clear bits 5-6 (ultimatic priority bits)
-            self.current_pin_config &= ~0x60
-            
-            if self.ultimatic_priority == 1:  # Dah Priority
-                self.current_pin_config |= 0x20  # Set bit 5 for Dah priority
-            elif self.ultimatic_priority == 2:  # Dit Priority
-                self.current_pin_config |= 0x40  # Set bit 6 for Dit priority
-            # Normal priority is both bits clear (0)
-            
-            # Send updated pin config
-            self.send_bytes([0x09, self.current_pin_config])
+            self.ultimatic_priority = self.ultimatic_priority_combo.currentIndex()
+            self.update_pin_config()
             self.add_log_entry(
-                f"    Ultimatic priority: {self.ultimatic_priority.currentText()}", 
-                "sent"
-            )
-            self.add_log_entry(
-                f"    Pin config: 0x{self.current_pin_config:02X} "
-                f"({self.current_pin_config:08b})", 
+                f"    Ultimatic priority: {self.ultimatic_priority_combo.currentText()}", 
                 "sent"
             )
         
@@ -837,18 +887,11 @@ class WK3Interface(QMainWindow):
             
         self.sidetone_enabled = not self.sidetone_enabled
         
-        # Update pin config while preserving Ultimatic priority bits
-        # Clear bit 1 (sidetone) first
-        self.current_pin_config &= ~0x02
-        # Then set it if enabled
-        if self.sidetone_enabled:
-            self.current_pin_config |= 0x02
-        
-        if self.send_bytes([0x09, self.current_pin_config]):
-            self.add_log_entry(
-                f"🔊 Sidetone: {'ON' if self.sidetone_enabled else 'OFF'}", 
-                "sent"
-            )
+        self.update_pin_config()
+        self.add_log_entry(
+            f"🔊 Sidetone: {'ON' if self.sidetone_enabled else 'OFF'}", 
+            "sent"
+        )
             
         self.update_sidetone_display()
             
@@ -875,6 +918,100 @@ class WK3Interface(QMainWindow):
             )
         else:
             self.sidetone_btn.setStyleSheet("")
+            
+    def update_pin_config(self):
+        """Update and send the PinCFG register based on current settings"""
+        # Build the pin config byte from individual settings
+        pin_config = 0
+        
+        # Bits 7,6: Ultimatic Priority (00=Normal, 01=Dah Pri, 10=Dit Pri)
+        pin_config |= (self.ultimatic_priority & 0x03) << 6
+        
+        # Bits 5,4: Hangtime (00=1ws+1dit, 01=1ws+2dit, 10=1ws+4dit, 11=1ws+8dit)
+        pin_config |= (self.hangtime_setting & 0x03) << 4
+        
+        # Bit 3: Key Out 1
+        if self.keyout1_enabled:
+            pin_config |= 0x08
+            
+        # Bit 2: Key Out 2
+        if self.keyout2_enabled:
+            pin_config |= 0x04
+            
+        # Bit 1: Sidetone
+        if self.sidetone_enabled:
+            pin_config |= 0x02
+            
+        # Bit 0: PTT
+        if self.ptt_enabled:
+            pin_config |= 0x01
+            
+        self.current_pin_config = pin_config
+        
+        if self.send_bytes([0x09, self.current_pin_config]):
+            self.add_log_entry(
+                f"    Pin config: 0x{self.current_pin_config:02X} "
+                f"({self.current_pin_config:08b})", 
+                "sent"
+            )
+            
+    def set_hangtime(self):
+        """Set the hangtime setting"""
+        if not self.host_mode_active:
+            self.add_log_entry("⚠️ Must be in host mode to change settings", "error")
+            return
+            
+        self.hangtime_setting = self.hangtime_combo.currentIndex()
+        self.update_pin_config()
+        self.add_log_entry(
+            f"⏱️ Hangtime: {self.hangtime_combo.currentText()}", 
+            "sent"
+        )
+        
+    def toggle_keyout1(self, state):
+        """Toggle Key Out 1"""
+        if not self.host_mode_active:
+            self.add_log_entry("⚠️ Must be in host mode to change settings", "error")
+            self.keyout1_cb.setChecked(self.keyout1_enabled)  # Revert checkbox
+            return
+            
+        from PyQt6.QtCore import Qt
+        self.keyout1_enabled = (state == Qt.CheckState.Checked.value)
+        self.update_pin_config()
+        self.add_log_entry(
+            f"🔑 Key Out 1: {'ON' if self.keyout1_enabled else 'OFF'}", 
+            "sent"
+        )
+        
+    def toggle_keyout2(self, state):
+        """Toggle Key Out 2"""
+        if not self.host_mode_active:
+            self.add_log_entry("⚠️ Must be in host mode to change settings", "error")
+            self.keyout2_cb.setChecked(self.keyout2_enabled)  # Revert checkbox
+            return
+            
+        from PyQt6.QtCore import Qt
+        self.keyout2_enabled = (state == Qt.CheckState.Checked.value)
+        self.update_pin_config()
+        self.add_log_entry(
+            f"🔑 Key Out 2: {'ON' if self.keyout2_enabled else 'OFF'}", 
+            "sent"
+        )
+        
+    def toggle_ptt(self, state):
+        """Toggle PTT enable"""
+        if not self.host_mode_active:
+            self.add_log_entry("⚠️ Must be in host mode to change settings", "error")
+            self.ptt_cb.setChecked(self.ptt_enabled)  # Revert checkbox
+            return
+            
+        from PyQt6.QtCore import Qt
+        self.ptt_enabled = (state == Qt.CheckState.Checked.value)
+        self.update_pin_config()
+        self.add_log_entry(
+            f"📡 PTT: {'ON' if self.ptt_enabled else 'OFF'}", 
+            "sent"
+        )
             
     def send_command(self):
         """Send a raw command to the WK3 device"""
