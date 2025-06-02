@@ -23,4 +23,7 @@ It supports nearly all commonly used WKUSB settings and commands, and includes s
 3. *BEFORE* reporting any issues, close the program, unplug your WKUSB device, plug it back in and try again. Then email me :)
 
 ## Getting Started (Local; MAC/LIN)
-- Coming Soon
+1. Clone repo
+2. Extract and navigate to folder
+3. Run `python3 -m pip install -r requirements.txt`
+4. Run `python3 ./wk3_app.py`
