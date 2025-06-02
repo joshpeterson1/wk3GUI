@@ -273,6 +273,9 @@ class WK3Interface(QMainWindow):
         
         controls_layout.addWidget(pincfg_box)
         
+        # Hide advanced settings by default
+        pincfg_box.setVisible(False)
+        
         # WKMode controls
         wkmode_box = QGroupBox("WKMode Settings")
         wkmode_layout = QVBoxLayout(wkmode_box)
@@ -306,6 +309,13 @@ class WK3Interface(QMainWindow):
         wkmode_layout.addLayout(comm_layout)
         
         controls_layout.addWidget(wkmode_box)
+        
+        # Hide advanced settings by default
+        wkmode_box.setVisible(False)
+        
+        # Store references to advanced settings boxes
+        self.pincfg_box = pincfg_box
+        self.wkmode_box = wkmode_box
         
         main_layout.addWidget(controls_box)
         
@@ -447,6 +457,21 @@ class WK3Interface(QMainWindow):
         
         file_menu.addSeparator()
         
+        # Host Mode actions
+        open_host_action = QAction('&Open Host Mode', self)
+        open_host_action.setShortcut('Ctrl+O')
+        open_host_action.setStatusTip('Enter host mode on WK3 device')
+        open_host_action.triggered.connect(self.enter_host_mode)
+        file_menu.addAction(open_host_action)
+        
+        close_host_action = QAction('&Close Host Mode', self)
+        close_host_action.setShortcut('Ctrl+Shift+O')
+        close_host_action.setStatusTip('Exit host mode on WK3 device')
+        close_host_action.triggered.connect(self.exit_host_mode)
+        file_menu.addAction(close_host_action)
+        
+        file_menu.addSeparator()
+        
         # Exit action
         exit_action = QAction('E&xit', self)
         exit_action.setShortcut('Ctrl+Q')
@@ -482,23 +507,16 @@ class WK3Interface(QMainWindow):
         self.debug_panel_action.triggered.connect(self.toggle_debug_panel)
         view_menu.addAction(self.debug_panel_action)
         
+        # Advanced Settings toggle action
+        self.advanced_settings_action = QAction('&Advanced Settings', self)
+        self.advanced_settings_action.setCheckable(True)
+        self.advanced_settings_action.setShortcut('Ctrl+Shift+A')
+        self.advanced_settings_action.setStatusTip('Show/hide advanced PinCFG and WKMode settings')
+        self.advanced_settings_action.triggered.connect(self.toggle_advanced_settings)
+        view_menu.addAction(self.advanced_settings_action)
+        
         # Tools menu
         tools_menu = menubar.addMenu('&Tools')
-        
-        # Host Mode actions
-        open_host_action = QAction('&Open Host Mode', self)
-        open_host_action.setShortcut('Ctrl+O')
-        open_host_action.setStatusTip('Enter host mode on WK3 device')
-        open_host_action.triggered.connect(self.enter_host_mode)
-        tools_menu.addAction(open_host_action)
-        
-        close_host_action = QAction('&Close Host Mode', self)
-        close_host_action.setShortcut('Ctrl+Shift+O')
-        close_host_action.setStatusTip('Exit host mode on WK3 device')
-        close_host_action.triggered.connect(self.exit_host_mode)
-        tools_menu.addAction(close_host_action)
-        
-        tools_menu.addSeparator()
         
         # Test action
         test_action = QAction('Run &Basic WK3 Test', self)
@@ -541,6 +559,13 @@ class WK3Interface(QMainWindow):
         """
         
         QMessageBox.about(self, "About WK3 Device Interface", about_text)
+        
+    def toggle_advanced_settings(self):
+        """Toggle the visibility of advanced settings (PinCFG and WKMode)"""
+        is_visible = not self.pincfg_box.isVisible()
+        self.pincfg_box.setVisible(is_visible)
+        self.wkmode_box.setVisible(is_visible)
+        self.advanced_settings_action.setChecked(is_visible)
         
     def refresh_ports(self):
         """Refresh the list of available serial ports"""
