@@ -419,6 +419,45 @@ class WK3Interface(QMainWindow):
         
         main_layout.addWidget(self.debug_box)
         
+        # Send window (hidden by default)
+        self.send_window_box = QGroupBox("Send Text to WK3")
+        self.send_window_box.setVisible(False)
+        send_window_layout = QVBoxLayout(self.send_window_box)
+        
+        # Text input area
+        self.send_text_input = QTextEdit()
+        self.send_text_input.setPlaceholderText("Enter ASCII text to send to WK3 device...")
+        self.send_text_input.setMaximumHeight(100)
+        self.send_text_input.setStyleSheet(
+            "background-color: #f7fafc; border: 1px solid #e2e8f0; "
+            "font-family: monospace; font-size: 12px;"
+        )
+        send_window_layout.addWidget(self.send_text_input)
+        
+        # Send controls
+        send_controls_layout = QHBoxLayout()
+        self.send_text_btn = QPushButton("Send Text")
+        self.send_text_btn.setEnabled(False)
+        self.clear_send_text_btn = QPushButton("Clear")
+        
+        # Character count label
+        self.char_count_label = QLabel("0 characters")
+        self.char_count_label.setStyleSheet("color: #718096; font-size: 11px;")
+        
+        send_controls_layout.addWidget(self.send_text_btn)
+        send_controls_layout.addWidget(self.clear_send_text_btn)
+        send_controls_layout.addStretch()
+        send_controls_layout.addWidget(self.char_count_label)
+        send_window_layout.addLayout(send_controls_layout)
+        
+        # Info label
+        info_label = QLabel("Text will be converted to uppercase and sent as raw ASCII bytes to the WK3 device.")
+        info_label.setStyleSheet("color: #718096; font-size: 11px; font-style: italic;")
+        info_label.setWordWrap(True)
+        send_window_layout.addWidget(info_label)
+        
+        main_layout.addWidget(self.send_window_box)
+        
         # Connect signals
         self.connect_btn.clicked.connect(self.connect_to_device)
         self.disconnect_btn.clicked.connect(self.disconnect_from_device)
@@ -447,6 +486,9 @@ class WK3Interface(QMainWindow):
         self.send_cmd_btn.clicked.connect(self.send_command)
         self.clear_log_btn.clicked.connect(self.clear_log)
         self.test_wk3_btn.clicked.connect(self.test_wk3)
+        self.send_text_btn.clicked.connect(self.send_text_to_device)
+        self.clear_send_text_btn.clicked.connect(self.clear_send_text)
+        self.send_text_input.textChanged.connect(self.update_char_count)
         
         # Initialize the log
         self.add_log_entry("Ready to connect to WK3 device...")
@@ -543,6 +585,14 @@ class WK3Interface(QMainWindow):
         self.advanced_settings_action.triggered.connect(self.toggle_advanced_settings)
         view_menu.addAction(self.advanced_settings_action)
         
+        # Send Window toggle action
+        self.send_window_action = QAction('&Send Window', self)
+        self.send_window_action.setCheckable(True)
+        self.send_window_action.setShortcut('Ctrl+Shift+S')
+        self.send_window_action.setStatusTip('Show/hide text send window')
+        self.send_window_action.triggered.connect(self.toggle_send_window)
+        view_menu.addAction(self.send_window_action)
+        
         # Tools menu
         tools_menu = menubar.addMenu('&Tools')
         
@@ -626,6 +676,64 @@ class WK3Interface(QMainWindow):
         self.wkmode_box.setVisible(is_visible)
         self.advanced_settings_action.setChecked(is_visible)
         
+    def toggle_send_window(self):
+        """Toggle the visibility of the send window"""
+        is_visible = not self.send_window_box.isVisible()
+        self.send_window_box.setVisible(is_visible)
+        self.send_window_action.setChecked(is_visible)
+        
+    def send_text_to_device(self):
+        """Send text from the send window to the WK3 device"""
+        text = self.send_text_input.toPlainText().strip()
+        if not text:
+            self.add_log_entry("⚠️ No text to send", "error")
+            return
+            
+        # Validate ASCII characters only
+        try:
+            # Check if all characters are ASCII
+            text.encode('ascii')
+        except UnicodeEncodeError:
+            self.add_log_entry("❌ Error: Only ASCII characters are allowed", "error")
+            return
+            
+        # Convert to uppercase
+        text_upper = text.upper()
+        
+        # Convert to bytes
+        text_bytes = text_upper.encode('ascii')
+        
+        # Send the bytes
+        if self.send_bytes(list(text_bytes)):
+            self.add_log_entry(f"📝 Sent text: \"{text_upper}\"", "sent")
+            self.add_log_entry(f"    Original: \"{text}\"", "sent")
+            self.add_log_entry(f"    Length: {len(text_bytes)} bytes", "sent")
+        else:
+            self.add_log_entry("❌ Failed to send text", "error")
+            
+    def clear_send_text(self):
+        """Clear the send text input"""
+        self.send_text_input.clear()
+        
+    def update_char_count(self):
+        """Update the character count label"""
+        text = self.send_text_input.toPlainText()
+        char_count = len(text)
+        
+        # Check for non-ASCII characters
+        try:
+            text.encode('ascii')
+            ascii_valid = True
+        except UnicodeEncodeError:
+            ascii_valid = False
+            
+        if ascii_valid:
+            self.char_count_label.setText(f"{char_count} characters")
+            self.char_count_label.setStyleSheet("color: #718096; font-size: 11px;")
+        else:
+            self.char_count_label.setText(f"{char_count} characters (contains non-ASCII)")
+            self.char_count_label.setStyleSheet("color: #e53e3e; font-size: 11px; font-weight: bold;")
+        
     def refresh_ports(self):
         """Refresh the list of available serial ports"""
         current_port = self.port_combo.currentText()
@@ -690,6 +798,7 @@ class WK3Interface(QMainWindow):
             self.close_host_btn.setEnabled(True)
             self.send_cmd_btn.setEnabled(True)
             self.test_wk3_btn.setEnabled(True)
+            self.send_text_btn.setEnabled(True)
         else:
             self.status_label.setText("Disconnected")
             self.status_label.setStyleSheet(
@@ -702,6 +811,7 @@ class WK3Interface(QMainWindow):
             self.close_host_btn.setEnabled(False)
             self.send_cmd_btn.setEnabled(False)
             self.test_wk3_btn.setEnabled(False)
+            self.send_text_btn.setEnabled(False)
             
             # Also disable all host mode controls
             self.host_mode_active = False
