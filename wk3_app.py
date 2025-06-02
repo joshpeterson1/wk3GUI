@@ -722,9 +722,15 @@ class WK3Interface(QMainWindow):
         
         # Add printable ASCII characters to the ASCII monitor
         if 32 <= byte <= 126:
-            self.append_to_ascii_monitor(chr(byte))
+            char = chr(byte)
+            self.append_to_ascii_monitor(char)
+            self.add_log_entry(f"    Paddle input: '{char}'", "received")
         elif byte in (13, 10):  # CR or LF
             self.append_to_ascii_monitor('\n')
+            self.add_log_entry(f"    Paddle input: [NEWLINE]", "received")
+        elif byte == 32:  # Space
+            self.append_to_ascii_monitor(' ')
+            self.add_log_entry(f"    Paddle input: [SPACE]", "received")
             
         # Special handling for specific Admin command responses
         if self.last_command_byte == 0x21:
@@ -857,28 +863,50 @@ class WK3Interface(QMainWindow):
         self.ascii_monitor.moveCursor(self.ascii_monitor.textCursor().MoveOperation.End)
         
         # If keyboard emulation is active, send the character
-        if self.keyboard_emulation_active and text.strip():
+        if self.keyboard_emulation_active and text:
             self.emulate_key(text)
             
     def emulate_key(self, char):
         """Emulate keyboard input for the given character"""
         try:
-            # Use pynput to type the character system-wide
-            self.keyboard_controller.type(char)
-            self.emulation_status.setText(f"Last key: {char}")
+            # Handle special characters
+            if char == '\n':
+                # Send Enter key for newlines
+                self.keyboard_controller.press(keyboard.Key.enter)
+                self.keyboard_controller.release(keyboard.Key.enter)
+                self.emulation_status.setText("Last key: [ENTER]")
+            elif char == ' ':
+                # Send space key
+                self.keyboard_controller.press(keyboard.Key.space)
+                self.keyboard_controller.release(keyboard.Key.space)
+                self.emulation_status.setText("Last key: [SPACE]")
+            elif len(char) == 1 and 32 <= ord(char) <= 126:
+                # Send printable ASCII characters
+                self.keyboard_controller.type(char)
+                self.emulation_status.setText(f"Last key: {char}")
+            else:
+                # For other characters, try to type them directly
+                self.keyboard_controller.type(char)
+                self.emulation_status.setText(f"Last key: {repr(char)}")
+                
         except Exception as e:
-            self.emulation_status.setText(f"Error: {e}")
+            self.emulation_status.setText(f"Error: {str(e)}")
+            self.add_log_entry(f"⚠️ Keyboard emulation error: {str(e)}", "error")
             
     def toggle_keyboard_emulation(self, state):
         """Toggle keyboard emulation on/off"""
         from PyQt6.QtCore import Qt
         self.keyboard_emulation_active = (state == Qt.CheckState.Checked.value)
         if self.keyboard_emulation_active:
-            self.emulation_status.setText("Active - Paddle input will be typed system-wide")
+            self.emulation_status.setText("🎹 Active - Paddle input will be typed system-wide")
+            self.emulation_status.setStyleSheet("color: #48bb78; font-weight: bold;")
             self.keyboard_emulation_cb.setText("Disable Keyboard Emulation")
+            self.add_log_entry("🎹 Keyboard emulation enabled", "connected")
         else:
-            self.emulation_status.setText("")
+            self.emulation_status.setText("⏸️ Inactive")
+            self.emulation_status.setStyleSheet("color: #a0aec0;")
             self.keyboard_emulation_cb.setText("Enable Keyboard Emulation")
+            self.add_log_entry("⏸️ Keyboard emulation disabled", "disconnected")
             
     def clear_ascii_monitor(self):
         """Clear the ASCII monitor"""
