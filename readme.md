@@ -16,9 +16,11 @@ It supports nearly all commonly used WKUSB settings and commands, and includes s
 - Practice mode with character echo and speed settings
 - EEPROM access and device diagnostics
 
-## Getting Started (Local)
+## Getting Started (Local; WIN)
 
 1. Download latest .exe from releases
 2. Run file, select click connect, select COM Port, then Open Host mode.
 3. *BEFORE* reporting any issues, close the program, unplug your WKUSB device, plug it back in and try again. Then email me :)
 
+## Getting Started (Local; MAC/LIN)
+- Coming Soon
