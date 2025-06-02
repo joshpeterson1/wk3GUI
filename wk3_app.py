@@ -546,6 +546,16 @@ class WK3Interface(QMainWindow):
         # Tools menu
         tools_menu = menubar.addMenu('&Tools')
         
+        # Keyboard Emulation toggle action
+        self.keyboard_emulation_action = QAction('&Keyboard Emulation', self)
+        self.keyboard_emulation_action.setCheckable(True)
+        self.keyboard_emulation_action.setShortcut('Ctrl+K')
+        self.keyboard_emulation_action.setStatusTip('Toggle keyboard emulation for paddle input')
+        self.keyboard_emulation_action.triggered.connect(self.toggle_keyboard_emulation_menu)
+        tools_menu.addAction(self.keyboard_emulation_action)
+        
+        tools_menu.addSeparator()
+        
         # Test action
         test_action = QAction('Run &Basic WK3 Test', self)
         test_action.setShortcut('Ctrl+T')
@@ -966,6 +976,14 @@ class WK3Interface(QMainWindow):
             self.keyboard_emulation_cb.setText("Enable Keyboard Emulation")
             self.caps_lock_cb.setVisible(False)  # Hide caps lock checkbox
             self.add_log_entry("⏸️ Keyboard emulation disabled", "disconnected")
+            
+        # Sync the menu action
+        self.keyboard_emulation_action.setChecked(self.keyboard_emulation_active)
+        
+    def toggle_keyboard_emulation_menu(self):
+        """Toggle keyboard emulation from the menu"""
+        # Update the checkbox to match the menu action
+        self.keyboard_emulation_cb.setChecked(self.keyboard_emulation_action.isChecked())
             
     def toggle_caps_lock(self, state):
         """Toggle caps lock for keyboard emulation"""
