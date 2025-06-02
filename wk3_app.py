@@ -126,7 +126,8 @@ class WK3Interface(QMainWindow):
     def set_application_icon(self):
         """Set the application icon using available logo files"""
         # Try different icon files in order of preference
-        icon_files = ['logo.ico', 'sqlogo.png', 'logo.png']
+        # Use square logo first for better taskbar appearance
+        icon_files = ['sqlogo.png', 'logo.ico', 'logo.png']
         
         for icon_file in icon_files:
             if os.path.exists(icon_file):
