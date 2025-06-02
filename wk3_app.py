@@ -429,7 +429,7 @@ class WK3Interface(QMainWindow):
         self.send_text_input.setPlaceholderText("Enter ASCII text to send to WK3 device...")
         self.send_text_input.setMaximumHeight(100)
         self.send_text_input.setStyleSheet(
-            "background-color: #f7fafc; border: 1px solid #e2e8f0; "
+            "background-color: #2d3748; color: #e2e8f0; border: 1px solid #4a5568; "
             "font-family: monospace; font-size: 12px;"
         )
         send_window_layout.addWidget(self.send_text_input)
