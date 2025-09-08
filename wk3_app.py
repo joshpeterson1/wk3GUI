@@ -419,6 +419,18 @@ class WK3Interface(QMainWindow):
         key_delay_layout.addWidget(self.key_delay_label)
         morse_timing_layout.addLayout(key_delay_layout)
         
+        # Letter spacing slider
+        letter_space_layout = QHBoxLayout()
+        self.letter_space_slider = QSlider(Qt.Orientation.Horizontal)
+        self.letter_space_slider.setRange(200, 800)
+        self.letter_space_slider.setValue(400)  # Default 400ms
+        self.letter_space_label = QLabel("400 ms")
+        
+        letter_space_layout.addWidget(QLabel("Letter Spacing:"))
+        letter_space_layout.addWidget(self.letter_space_slider)
+        letter_space_layout.addWidget(self.letter_space_label)
+        morse_timing_layout.addLayout(letter_space_layout)
+        
         monitor_layout.addWidget(self.morse_timing_box)
         
         # ASCII Monitor display
@@ -546,6 +558,7 @@ class WK3Interface(QMainWindow):
         self.morse_invaders_cb.stateChanged.connect(self.toggle_morse_invaders)
         self.key_duration_slider.valueChanged.connect(self.update_key_duration_display)
         self.key_delay_slider.valueChanged.connect(self.update_key_delay_display)
+        self.letter_space_slider.valueChanged.connect(self.update_letter_space_display)
         
         # Initialize the log
         self.add_log_entry("Ready to connect to WK3 device...")
@@ -1181,6 +1194,10 @@ class WK3Interface(QMainWindow):
                 # Adjustable delay between dits/dahs, but skip delay after last one
                 if i < len(morse_pattern) - 1:
                     time.sleep(key_delay)
+            
+            # Add letter spacing after each complete letter
+            letter_space = self.letter_space_slider.value() / 1000.0  # Convert ms to seconds
+            time.sleep(letter_space)
                 
             # Update status
             sequence_str = ' '.join(control_sequence)
@@ -1283,6 +1300,11 @@ class WK3Interface(QMainWindow):
         """Update the key delay display when the slider changes"""
         delay = self.key_delay_slider.value()
         self.key_delay_label.setText(f"{delay} ms")
+        
+    def update_letter_space_display(self):
+        """Update the letter spacing display when the slider changes"""
+        spacing = self.letter_space_slider.value()
+        self.letter_space_label.setText(f"{spacing} ms")
             
     def toggle_caps_lock(self, state):
         """Toggle caps lock for keyboard emulation"""
