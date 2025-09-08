@@ -1063,8 +1063,8 @@ class WK3Interface(QMainWindow):
         self.ascii_monitor.insertPlainText(text)
         self.ascii_monitor.moveCursor(self.ascii_monitor.textCursor().MoveOperation.End)
         
-        # If keyboard emulation is active, send the character
-        if self.keyboard_emulation_active and text:
+        # If any emulation mode is active, send the character
+        if (self.keyboard_emulation_active or self.morse_invaders_active) and text:
             self.emulate_key(text)
             
     def emulate_key(self, char):
