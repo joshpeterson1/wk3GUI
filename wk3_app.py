@@ -390,6 +390,37 @@ class WK3Interface(QMainWindow):
         emulation_layout.addWidget(self.emulation_status)
         monitor_layout.addLayout(emulation_layout)
         
+        # MorseInvaders timing controls (hidden by default)
+        self.morse_timing_box = QGroupBox("MorseInvaders Timing")
+        self.morse_timing_box.setVisible(False)
+        morse_timing_layout = QVBoxLayout(self.morse_timing_box)
+        
+        # Key duration slider
+        key_duration_layout = QHBoxLayout()
+        self.key_duration_slider = QSlider(Qt.Orientation.Horizontal)
+        self.key_duration_slider.setRange(10, 100)
+        self.key_duration_slider.setValue(30)  # Default 30ms
+        self.key_duration_label = QLabel("30 ms")
+        
+        key_duration_layout.addWidget(QLabel("Key Duration:"))
+        key_duration_layout.addWidget(self.key_duration_slider)
+        key_duration_layout.addWidget(self.key_duration_label)
+        morse_timing_layout.addLayout(key_duration_layout)
+        
+        # Delay between keys slider
+        key_delay_layout = QHBoxLayout()
+        self.key_delay_slider = QSlider(Qt.Orientation.Horizontal)
+        self.key_delay_slider.setRange(10, 100)
+        self.key_delay_slider.setValue(20)  # Default 20ms
+        self.key_delay_label = QLabel("20 ms")
+        
+        key_delay_layout.addWidget(QLabel("Delay Between Keys:"))
+        key_delay_layout.addWidget(self.key_delay_slider)
+        key_delay_layout.addWidget(self.key_delay_label)
+        morse_timing_layout.addLayout(key_delay_layout)
+        
+        monitor_layout.addWidget(self.morse_timing_box)
+        
         # ASCII Monitor display
         monitor_display_layout = QHBoxLayout()
         self.ascii_monitor = QTextEdit()
@@ -513,6 +544,8 @@ class WK3Interface(QMainWindow):
         self.clear_send_text_btn.clicked.connect(self.clear_send_text)
         self.send_text_input.textChanged.connect(self.update_char_count)
         self.morse_invaders_cb.stateChanged.connect(self.toggle_morse_invaders)
+        self.key_duration_slider.valueChanged.connect(self.update_key_duration_display)
+        self.key_delay_slider.valueChanged.connect(self.update_key_delay_display)
         
         # Initialize the log
         self.add_log_entry("Ready to connect to WK3 device...")
@@ -1196,6 +1229,9 @@ class WK3Interface(QMainWindow):
             self.caps_lock_cb.setStyleSheet("opacity: 0.5;")
             self.caps_lock_cb.setVisible(True)  # Make it visible but grayed out
             
+            # Show timing controls
+            self.morse_timing_box.setVisible(True)
+            
             # Update status and styling
             self.emulation_status.setText("🎮 MorseInvaders Active - Dit=L_CTRL, Dah=R_CTRL")
             self.emulation_status.setStyleSheet("color: #9f7aea; font-weight: bold;")
@@ -1215,6 +1251,9 @@ class WK3Interface(QMainWindow):
             self.caps_lock_cb.setStyleSheet("")
             self.caps_lock_cb.setVisible(False)  # Hide it again
             
+            # Hide timing controls
+            self.morse_timing_box.setVisible(False)
+            
             # Update status and styling
             self.emulation_status.setText("🎮 MorseInvaders Inactive")
             self.emulation_status.setStyleSheet("color: #a0aec0;")
@@ -1230,6 +1269,16 @@ class WK3Interface(QMainWindow):
         """Toggle MorseInvaders mode from the menu"""
         # Update the checkbox to match the menu action
         self.morse_invaders_cb.setChecked(self.morse_invaders_action.isChecked())
+        
+    def update_key_duration_display(self):
+        """Update the key duration display when the slider changes"""
+        duration = self.key_duration_slider.value()
+        self.key_duration_label.setText(f"{duration} ms")
+        
+    def update_key_delay_display(self):
+        """Update the key delay display when the slider changes"""
+        delay = self.key_delay_slider.value()
+        self.key_delay_label.setText(f"{delay} ms")
             
     def toggle_caps_lock(self, state):
         """Toggle caps lock for keyboard emulation"""
