@@ -1125,25 +1125,25 @@ class WK3Interface(QMainWindow):
             # Get Morse pattern
             morse_pattern = self.MORSE_CODE[char_upper]
             
-            # Send control keys for each dit/dah - much faster timing for gaming
+            # Send control keys for each dit/dah - fine-tuned timing for gaming
             control_sequence = []
             for i, symbol in enumerate(morse_pattern):
                 if symbol == '.':
-                    # Dit = LEFT CTRL - quick press
+                    # Dit = LEFT CTRL - short press
                     self.keyboard_controller.press(keyboard.Key.ctrl_l)
-                    time.sleep(0.02)  # Hold key for 20ms
+                    time.sleep(0.01)  # Hold key for 10ms
                     self.keyboard_controller.release(keyboard.Key.ctrl_l)
                     control_sequence.append('L')
                 elif symbol == '-':
-                    # Dah = RIGHT CTRL - quick press
+                    # Dah = RIGHT CTRL - short press
                     self.keyboard_controller.press(keyboard.Key.ctrl_r)
-                    time.sleep(0.02)  # Hold key for 20ms
+                    time.sleep(0.01)  # Hold key for 10ms
                     self.keyboard_controller.release(keyboard.Key.ctrl_r)
                     control_sequence.append('R')
                     
-                # Very short delay between dits/dahs, but skip delay after last one
+                # Short delay between dits/dahs, but skip delay after last one
                 if i < len(morse_pattern) - 1:
-                    time.sleep(0.01)  # 10ms between each dit/dah
+                    time.sleep(0.02)  # 20ms between each dit/dah
                 
             # Update status
             sequence_str = ' '.join(control_sequence)
