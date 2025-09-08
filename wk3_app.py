@@ -69,6 +69,26 @@ class SerialThread(QThread):
 
 class WK3Interface(QMainWindow):
     """Main application window for WK3 device interface"""
+    
+    # Morse code lookup table - maps ASCII characters to dit/dah patterns
+    MORSE_CODE = {
+        'A': '.-',    'B': '-...', 'C': '-.-.', 'D': '-..', 
+        'E': '.',     'F': '..-.', 'G': '--.', 'H': '....',
+        'I': '..',    'J': '.---', 'K': '-.-', 'L': '.-..',
+        'M': '--',    'N': '-.',   'O': '---', 'P': '.--.',
+        'Q': '--.-',  'R': '.-.',  'S': '...', 'T': '-',
+        'U': '..-',   'V': '...-', 'W': '.--', 'X': '-..-',
+        'Y': '-.--',  'Z': '--..',
+        '0': '-----', '1': '.----', '2': '..---', '3': '...--',
+        '4': '....-', '5': '.....', '6': '-....', '7': '--...',
+        '8': '---..', '9': '----.',
+        '.': '.-.-.-', ',': '--..--', '?': '..--..', "'": '.----.',
+        '!': '-.-.--', '/': '-..-.', '(': '-.--.', ')': '-.--.-',
+        '&': '.-...', ':': '---...', ';': '-.-.-.', '=': '-...-',
+        '+': '.-.-.', '-': '-....-', '_': '..--.-', '"': '.-..-.',
+        '$': '...-..-', '@': '.--.-.'
+    }
+    
     def __init__(self):
         """Initialize the main window and setup UI"""
         super().__init__()
@@ -82,6 +102,7 @@ class WK3Interface(QMainWindow):
         self.serial_thread = None
         self.keyboard_controller = keyboard.Controller()
         self.keyboard_emulation_active = False
+        self.morse_invaders_active = False
         
         # WK3 state variables
         self.current_mode_register = 0x50  # Default: 01010000 - Iambic A mode
@@ -360,10 +381,12 @@ class WK3Interface(QMainWindow):
         self.caps_lock_cb = QCheckBox("CAPS LOCK")
         self.caps_lock_cb.setVisible(False)  # Hidden by default
         self.caps_lock_cb.setChecked(True)   # Default to uppercase (matching WK3 output)
+        self.morse_invaders_cb = QCheckBox("MorseInvaders")
         self.emulation_status = QLabel("")
         
         emulation_layout.addWidget(self.keyboard_emulation_cb)
         emulation_layout.addWidget(self.caps_lock_cb)
+        emulation_layout.addWidget(self.morse_invaders_cb)
         emulation_layout.addWidget(self.emulation_status)
         monitor_layout.addLayout(emulation_layout)
         
@@ -489,6 +512,7 @@ class WK3Interface(QMainWindow):
         self.send_text_btn.clicked.connect(self.send_text_to_device)
         self.clear_send_text_btn.clicked.connect(self.clear_send_text)
         self.send_text_input.textChanged.connect(self.update_char_count)
+        self.morse_invaders_cb.stateChanged.connect(self.toggle_morse_invaders)
         
         # Initialize the log
         self.add_log_entry("Ready to connect to WK3 device...")
@@ -603,6 +627,14 @@ class WK3Interface(QMainWindow):
         self.keyboard_emulation_action.setStatusTip('Toggle keyboard emulation for paddle input')
         self.keyboard_emulation_action.triggered.connect(self.toggle_keyboard_emulation_menu)
         tools_menu.addAction(self.keyboard_emulation_action)
+        
+        # MorseInvaders toggle action
+        self.morse_invaders_action = QAction('&MorseInvaders Mode', self)
+        self.morse_invaders_action.setCheckable(True)
+        self.morse_invaders_action.setShortcut('Ctrl+M')
+        self.morse_invaders_action.setStatusTip('Toggle MorseInvaders mode (sends control keys for dit/dah)')
+        self.morse_invaders_action.triggered.connect(self.toggle_morse_invaders_menu)
+        tools_menu.addAction(self.morse_invaders_action)
         
         tools_menu.addSeparator()
         
@@ -1038,37 +1070,85 @@ class WK3Interface(QMainWindow):
     def emulate_key(self, char):
         """Emulate keyboard input for the given character"""
         try:
-            # Handle special characters
-            if char == '\n':
-                # Send Enter key for newlines
-                self.keyboard_controller.press(keyboard.Key.enter)
-                self.keyboard_controller.release(keyboard.Key.enter)
-                self.emulation_status.setText("Last key: [ENTER]")
-            elif char == ' ':
-                # Send space key
-                self.keyboard_controller.press(keyboard.Key.space)
-                self.keyboard_controller.release(keyboard.Key.space)
-                self.emulation_status.setText("Last key: [SPACE]")
-            elif len(char) == 1 and 32 <= ord(char) <= 126:
-                # Apply caps lock setting to alphabetic characters
-                output_char = char
-                if char.isalpha():
-                    if self.caps_lock_cb.isChecked():
-                        output_char = char.upper()
-                    else:
-                        output_char = char.lower()
-                
-                # Send printable ASCII characters
-                self.keyboard_controller.type(output_char)
-                self.emulation_status.setText(f"Last key: {output_char}")
-            else:
-                # For other characters, try to type them directly
-                self.keyboard_controller.type(char)
-                self.emulation_status.setText(f"Last key: {repr(char)}")
+            if self.morse_invaders_active:
+                # MorseInvaders mode - convert character to Morse and send control keys
+                self.send_morse_controls(char)
+            elif self.keyboard_emulation_active:
+                # Standard keyboard emulation mode
+                # Handle special characters
+                if char == '\n':
+                    # Send Enter key for newlines
+                    self.keyboard_controller.press(keyboard.Key.enter)
+                    self.keyboard_controller.release(keyboard.Key.enter)
+                    self.emulation_status.setText("Last key: [ENTER]")
+                elif char == ' ':
+                    # Send space key
+                    self.keyboard_controller.press(keyboard.Key.space)
+                    self.keyboard_controller.release(keyboard.Key.space)
+                    self.emulation_status.setText("Last key: [SPACE]")
+                elif len(char) == 1 and 32 <= ord(char) <= 126:
+                    # Apply caps lock setting to alphabetic characters
+                    output_char = char
+                    if char.isalpha():
+                        if self.caps_lock_cb.isChecked():
+                            output_char = char.upper()
+                        else:
+                            output_char = char.lower()
+                    
+                    # Send printable ASCII characters
+                    self.keyboard_controller.type(output_char)
+                    self.emulation_status.setText(f"Last key: {output_char}")
+                else:
+                    # For other characters, try to type them directly
+                    self.keyboard_controller.type(char)
+                    self.emulation_status.setText(f"Last key: {repr(char)}")
                 
         except Exception as e:
             self.emulation_status.setText(f"Error: {str(e)}")
             self.add_log_entry(f"⚠️ Keyboard emulation error: {str(e)}", "error")
+            
+    def send_morse_controls(self, char):
+        """Send control keys based on Morse code pattern for the character"""
+        try:
+            # Convert to uppercase for lookup
+            char_upper = char.upper()
+            
+            # Skip non-Morse characters
+            if char_upper not in self.MORSE_CODE:
+                if char in ['\n', ' ']:
+                    # For spaces and newlines, just update status
+                    self.emulation_status.setText(f"MorseInvaders: [{char.strip() or 'SPACE'}] (skipped)")
+                else:
+                    self.emulation_status.setText(f"MorseInvaders: '{char}' (unknown)")
+                return
+                
+            # Get Morse pattern
+            morse_pattern = self.MORSE_CODE[char_upper]
+            
+            # Send control keys for each dit/dah
+            control_sequence = []
+            for symbol in morse_pattern:
+                if symbol == '.':
+                    # Dit = LEFT CTRL
+                    self.keyboard_controller.press(keyboard.Key.ctrl_l)
+                    self.keyboard_controller.release(keyboard.Key.ctrl_l)
+                    control_sequence.append('L')
+                elif symbol == '-':
+                    # Dah = RIGHT CTRL
+                    self.keyboard_controller.press(keyboard.Key.ctrl_r)
+                    self.keyboard_controller.release(keyboard.Key.ctrl_r)
+                    control_sequence.append('R')
+                    
+                # Small delay between dits/dahs
+                time.sleep(0.05)
+                
+            # Update status
+            sequence_str = ' '.join(control_sequence)
+            self.emulation_status.setText(f"MorseInvaders: '{char_upper}' → {sequence_str}")
+            
+        except Exception as e:
+            self.emulation_status.setText(f"MorseInvaders Error: {str(e)}")
+            self.add_log_entry(f"⚠️ MorseInvaders error: {str(e)}", "error")
             
     def toggle_keyboard_emulation(self, state):
         """Toggle keyboard emulation on/off"""
@@ -1094,6 +1174,59 @@ class WK3Interface(QMainWindow):
         """Toggle keyboard emulation from the menu"""
         # Update the checkbox to match the menu action
         self.keyboard_emulation_cb.setChecked(self.keyboard_emulation_action.isChecked())
+        
+    def toggle_morse_invaders(self, state):
+        """Toggle MorseInvaders mode on/off"""
+        from PyQt6.QtCore import Qt
+        self.morse_invaders_active = (state == Qt.CheckState.Checked.value)
+        
+        if self.morse_invaders_active:
+            # Disable standard keyboard emulation
+            self.keyboard_emulation_active = False
+            self.keyboard_emulation_cb.setChecked(False)
+            self.keyboard_emulation_cb.setEnabled(False)
+            self.keyboard_emulation_cb.setStyleSheet("opacity: 0.5;")
+            
+            # Force caps lock ON and disable it
+            self.caps_lock_cb.setChecked(True)
+            self.caps_lock_cb.setEnabled(False)
+            self.caps_lock_cb.setStyleSheet("opacity: 0.5;")
+            self.caps_lock_cb.setVisible(True)  # Make it visible but grayed out
+            
+            # Update status and styling
+            self.emulation_status.setText("🎮 MorseInvaders Active - Dit=L_CTRL, Dah=R_CTRL")
+            self.emulation_status.setStyleSheet("color: #9f7aea; font-weight: bold;")
+            self.morse_invaders_cb.setText("Disable MorseInvaders")
+            self.morse_invaders_cb.setStyleSheet(
+                "background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);"
+            )
+            
+            self.add_log_entry("🎮 MorseInvaders mode enabled - Dit=LEFT_CTRL, Dah=RIGHT_CTRL", "connected")
+        else:
+            # Re-enable standard keyboard emulation controls
+            self.keyboard_emulation_cb.setEnabled(True)
+            self.keyboard_emulation_cb.setStyleSheet("")
+            
+            # Re-enable caps lock control
+            self.caps_lock_cb.setEnabled(True)
+            self.caps_lock_cb.setStyleSheet("")
+            self.caps_lock_cb.setVisible(False)  # Hide it again
+            
+            # Update status and styling
+            self.emulation_status.setText("🎮 MorseInvaders Inactive")
+            self.emulation_status.setStyleSheet("color: #a0aec0;")
+            self.morse_invaders_cb.setText("MorseInvaders")
+            self.morse_invaders_cb.setStyleSheet("")
+            
+            self.add_log_entry("🎮 MorseInvaders mode disabled", "disconnected")
+            
+        # Sync the menu action
+        self.morse_invaders_action.setChecked(self.morse_invaders_active)
+        
+    def toggle_morse_invaders_menu(self):
+        """Toggle MorseInvaders mode from the menu"""
+        # Update the checkbox to match the menu action
+        self.morse_invaders_cb.setChecked(self.morse_invaders_action.isChecked())
             
     def toggle_caps_lock(self, state):
         """Toggle caps lock for keyboard emulation"""
