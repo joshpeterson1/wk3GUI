@@ -398,9 +398,9 @@ class WK3Interface(QMainWindow):
         # Key duration slider
         key_duration_layout = QHBoxLayout()
         self.key_duration_slider = QSlider(Qt.Orientation.Horizontal)
-        self.key_duration_slider.setRange(10, 100)
-        self.key_duration_slider.setValue(30)  # Default 30ms
-        self.key_duration_label = QLabel("30 ms")
+        self.key_duration_slider.setRange(80, 300)
+        self.key_duration_slider.setValue(100)  # Default 100ms
+        self.key_duration_label = QLabel("100 ms")
         
         key_duration_layout.addWidget(QLabel("Key Duration:"))
         key_duration_layout.addWidget(self.key_duration_slider)
@@ -410,9 +410,9 @@ class WK3Interface(QMainWindow):
         # Delay between keys slider
         key_delay_layout = QHBoxLayout()
         self.key_delay_slider = QSlider(Qt.Orientation.Horizontal)
-        self.key_delay_slider.setRange(10, 100)
-        self.key_delay_slider.setValue(20)  # Default 20ms
-        self.key_delay_label = QLabel("20 ms")
+        self.key_delay_slider.setRange(80, 300)
+        self.key_delay_slider.setValue(150)  # Default 150ms
+        self.key_delay_label = QLabel("150 ms")
         
         key_delay_layout.addWidget(QLabel("Delay Between Keys:"))
         key_delay_layout.addWidget(self.key_delay_slider)
