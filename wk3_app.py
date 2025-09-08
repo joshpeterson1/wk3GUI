@@ -1129,18 +1129,20 @@ class WK3Interface(QMainWindow):
             control_sequence = []
             for symbol in morse_pattern:
                 if symbol == '.':
-                    # Dit = LEFT CTRL
+                    # Dit = LEFT CTRL - hold for longer
                     self.keyboard_controller.press(keyboard.Key.ctrl_l)
+                    time.sleep(0.1)  # Hold key for 100ms
                     self.keyboard_controller.release(keyboard.Key.ctrl_l)
                     control_sequence.append('L')
                 elif symbol == '-':
-                    # Dah = RIGHT CTRL
+                    # Dah = RIGHT CTRL - hold for longer
                     self.keyboard_controller.press(keyboard.Key.ctrl_r)
+                    time.sleep(0.1)  # Hold key for 100ms
                     self.keyboard_controller.release(keyboard.Key.ctrl_r)
                     control_sequence.append('R')
                     
-                # Small delay between dits/dahs
-                time.sleep(0.05)
+                # Longer delay between dits/dahs
+                time.sleep(0.15)  # 150ms between each dit/dah
                 
             # Update status
             sequence_str = ' '.join(control_sequence)
