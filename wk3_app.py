@@ -1161,22 +1161,26 @@ class WK3Interface(QMainWindow):
             # Send control keys for each dit/dah - fine-tuned timing for gaming
             control_sequence = []
             for i, symbol in enumerate(morse_pattern):
+                # Get timing values from sliders
+                key_duration = self.key_duration_slider.value() / 1000.0  # Convert ms to seconds
+                key_delay = self.key_delay_slider.value() / 1000.0  # Convert ms to seconds
+                
                 if symbol == '.':
-                    # Dit = LEFT CTRL - short press
+                    # Dit = LEFT CTRL - adjustable duration
                     self.keyboard_controller.press(keyboard.Key.ctrl_l)
-                    time.sleep(0.01)  # Hold key for 10ms
+                    time.sleep(key_duration)
                     self.keyboard_controller.release(keyboard.Key.ctrl_l)
                     control_sequence.append('L')
                 elif symbol == '-':
-                    # Dah = RIGHT CTRL - short press
+                    # Dah = RIGHT CTRL - adjustable duration
                     self.keyboard_controller.press(keyboard.Key.ctrl_r)
-                    time.sleep(0.01)  # Hold key for 10ms
+                    time.sleep(key_duration)
                     self.keyboard_controller.release(keyboard.Key.ctrl_r)
                     control_sequence.append('R')
                     
-                # Short delay between dits/dahs, but skip delay after last one
+                # Adjustable delay between dits/dahs, but skip delay after last one
                 if i < len(morse_pattern) - 1:
-                    time.sleep(0.02)  # 20ms between each dit/dah
+                    time.sleep(key_delay)
                 
             # Update status
             sequence_str = ' '.join(control_sequence)
