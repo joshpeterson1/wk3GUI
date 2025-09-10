@@ -147,8 +147,8 @@ class WK3Interface(QMainWindow):
     def set_application_icon(self):
         """Set the application icon using available logo files"""
         # Try different icon files in order of preference
-        # Use square logo first for better taskbar appearance
-        icon_files = ['sqlogo.png', 'logo.ico', 'logo.png']
+        # Use pylogo.ico first, then square logo for better taskbar appearance
+        icon_files = ['pylogo.ico', 'sqlogo.png', 'logo.ico', 'logo.png']
         
         for icon_file in icon_files:
             if os.path.exists(icon_file):
@@ -398,7 +398,7 @@ class WK3Interface(QMainWindow):
         # Key duration slider
         key_duration_layout = QHBoxLayout()
         self.key_duration_slider = QSlider(Qt.Orientation.Horizontal)
-        self.key_duration_slider.setRange(80, 300)
+        self.key_duration_slider.setRange(5, 300)
         self.key_duration_slider.setValue(100)  # Default 100ms
         self.key_duration_label = QLabel("100 ms")
         
@@ -410,7 +410,7 @@ class WK3Interface(QMainWindow):
         # Delay between keys slider
         key_delay_layout = QHBoxLayout()
         self.key_delay_slider = QSlider(Qt.Orientation.Horizontal)
-        self.key_delay_slider.setRange(80, 300)
+        self.key_delay_slider.setRange(5, 300)
         self.key_delay_slider.setValue(150)  # Default 150ms
         self.key_delay_label = QLabel("150 ms")
         
@@ -422,7 +422,7 @@ class WK3Interface(QMainWindow):
         # Letter spacing slider
         letter_space_layout = QHBoxLayout()
         self.letter_space_slider = QSlider(Qt.Orientation.Horizontal)
-        self.letter_space_slider.setRange(200, 800)
+        self.letter_space_slider.setRange(5, 800)
         self.letter_space_slider.setValue(400)  # Default 400ms
         self.letter_space_label = QLabel("400 ms")
         
