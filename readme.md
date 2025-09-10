@@ -2,6 +2,9 @@
 
 🔗 **Live site:** [https://wkusb-gui.glitch.me/](https://wkusb-gui.glitch.me/)
 
+## Visual Overview
+[Full Walkthrough](https://somber.wistia.com/medias/tcwperoit9)
+
 ## Overview
 
 **WKUSB GUI** is a cross-platform application for controlling and configuring a **WKUSB Morse keyer** device, either through a web interface or a local Python GUI.
@@ -23,4 +26,8 @@ It supports nearly all commonly used WKUSB settings and commands, and includes s
 3. *BEFORE* reporting any issues, close the program, unplug your WKUSB device, plug it back in and try again. Then email me :)
 
 ## Getting Started (Local; MAC/LIN)
-- Coming Soon
+_Authored and tested on Python 3.12.10; Your mileage may vary. Check out [pyenv](https://github.com/pyenv/pyenv) to try 3.12.10_
+1. Clone repo
+2. Extract and navigate to folder
+3. Run `python3 -m pip install -r requirements.txt`
+4. Run `python3 ./wk3_app.py`
