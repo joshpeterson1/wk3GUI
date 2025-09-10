@@ -1,7 +1,0 @@
-.aider*
-dist/
-build/
-*.spec
-*.png
-*.ico
-*.jpg
