@@ -19,3 +19,4 @@ build/wk3_app/wk3_app.pkg
 build/wk3_app/xref-wk3_app.html
 dist/wk3_app.exe
 wk3_app.spec
+.aider*
